@@ -2,6 +2,19 @@
 name = "recon-agent"
 version = "0.1.0"
 description = "Add your description here"
-readme = "README.md"
+authors = [
+    { name = "Bashir Aziz", email = "bashiraziz@users.noreply.github.com" }
+]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "google-generativeai>=0.8.5",
+    "openai>=1.109.1",
+    "streamlit>=1.50.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/recon_agent"]
