@@ -7,7 +7,7 @@ import re
 import sys
 from datetime import date
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
 import streamlit as st
@@ -16,6 +16,37 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile
 src_path = Path(__file__).resolve().parent / "src"
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
+
+
+def _load_env_file(paths: Iterable[Path], *, override: bool = False) -> None:
+    for path in paths:
+        if not path.exists():
+            continue
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            if not key or key.startswith("#"):
+                continue
+            cleaned = value.strip().strip("'\"")
+            if override or key not in os.environ:
+                os.environ[key] = cleaned
+
+
+env_candidates = [Path(".env"), Path(".env.local")]
+if load_dotenv is not None:
+    load_dotenv(override=False)
+else:
+    _load_env_file(env_candidates, override=False)
 
 from recon_agent import (  # type: ignore  # pylint: disable=wrong-import-position
     AgentConfig,
