@@ -10,6 +10,9 @@
 ## File descriptions
 - `gl_balances.csv` – month-end GL balances by account
 - `subledger_balances.csv` – supporting balances per subledger report
-- `transactions.csv` – optional activity used for variance explanation / roll-forward
+- `transactions.csv` - optional activity used for variance explanation / roll-forward
+- `detailed_transactions.csv` - richer transaction extract (account, posting date, debit/credit, reference) for auto-building period activity
+- `gl_detail.csv` - journal-level GL detail with document numbers and debits/credits
+- `subledger_detail.csv` - matching subledger drill-down (AP, inventory, etc.) with counterparty and document context
 
 All files use headers compatible with the Streamlit uploader. Period formatted as `YYYY-MM`, amounts in dollars.

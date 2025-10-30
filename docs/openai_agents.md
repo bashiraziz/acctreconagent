@@ -1,0 +1,135 @@
+# OpenAI Agents Orchestration Guide
+
+This guide walks through wiring the reconciliation engine into the OpenAI Agents SDK via `OpenAIAgentOrchestrator`. Use it when you want an LLM to coordinate GL vs subledger reconciliations, generate roll-forward schedules, and summarize the findings for accountants.
+
+## Prerequisites
+- Python 3.10+ with project dependencies installed (`uv sync` from the repo root).
+- Environment variables for OpenAI (required) and Gemini (optional) set either via `.env` or your shell session.
+- Sample GL/subledger balance extracts or an upstream data pipeline that can emit the required payload.
+
+```powershell
+# PowerShell example
+Copy-Item .env.sample .env  # edit OPENAI_API_KEY, GEMINI_API_KEY / GOOGLE_API_KEY
+. .\.venv\Scripts\Activate.ps1
+$env:OPENAI_API_KEY = "sk-..."
+$env:GEMINI_API_KEY = "..."      # optional for Gemini insights
+```
+
+## Minimal Example
+```python
+from recon_agent import (
+    AgentConfig,
+    GeminiConfig,
+    GeminiInsightGenerator,
+    GeminiLLM,
+    OpenAIAgentOrchestrator,
+    ReconciliationAgent,
+)
+
+reconciliation = ReconciliationAgent(
+    config=AgentConfig(materiality_threshold=10),
+    insight_generator=GeminiInsightGenerator(GeminiLLM(GeminiConfig())),
+)
+
+orchestrator = OpenAIAgentOrchestrator(reconciliation)
+
+reply = orchestrator.run(
+    "Reconcile inventory control account 1000 for October.",
+    tool_payload={
+        "gl_balances": [{"account": "1000", "period": "2024-10", "amount": 120000}],
+        "subledger_balances": [{"account": "1000", "period": "2024-10", "amount": 118500}],
+        "transactions": [
+            {
+                "account": "1000",
+                "booked_at": "2024-10-15",
+                "description": "Inventory adjustment",
+                "amount": -1500,
+            }
+        ],
+    },
+)
+
+print(reply.message)                        # Supervisor response
+print(reply.messages_by_role["reviewer"])   # Executive summary
+print(reply.tool_output["reconciliations"]) # Structured variance data
+```
+
+## Payload Schema
+The reconciliation tool enforces the JSON schema defined in `src/recon_agent/openai_agent.py`. Key collections:
+
+- `gl_balances` (required): list of objects with `account`, optional `period` (YYYY-MM), `amount`.
+- `subledger_balances` (required): mirrors the GL list.
+- `transactions` (optional): each object needs `account` and `booked_at` (ISO date). Supply either `amount` (signed) or both `debit`/`credit`. Additional properties (e.g., `metadata`, `period`) are preserved.
+- `ordered_periods` (optional): override auto-detected period sequence for roll-forward output.
+- `activity_by_period` (optional): map of period -> activity amount; computed automatically if you pass transactions with period metadata.
+- `adjustments_by_period` (optional): map of period -> manual adjustments to apply in the roll-forward.
+
+## Customizing Agents
+`OpenAIAgentOrchestrator` defaults to two roles:
+
+1. **Supervisor** - can call the reconciliation tool and is treated as the primary responder.
+2. **Reviewer** - summarizes the output based on the supervisor's message and raw JSON.
+
+Override behaviour by passing an `OpenAIMultiAgentConfig`:
+
+```python
+from recon_agent import (
+    OpenAIAgentConfig,
+    OpenAIAgentOrchestrator,
+    OpenAIMultiAgentConfig,
+    OrchestratedAgent,
+)
+
+multi = OpenAIMultiAgentConfig(
+    agents=[
+        OrchestratedAgent(
+            role="controller",
+            config=OpenAIAgentConfig(
+                model="gpt-4.1",
+                name="Controller",
+                instructions="Run the reconciliation tool and draft a controller-level summary.",
+            ),
+            uses_reconciliation_tool=True,
+        ),
+        OrchestratedAgent(
+            role="audit",
+            config=OpenAIAgentConfig(
+                name="Audit Reviewer",
+                instructions="Evaluate the controller's conclusion and note outstanding evidence requests.",
+            ),
+        ),
+    ],
+    primary_role="controller",
+)
+
+orchestrator = OpenAIAgentOrchestrator(reconciliation, multi)
+```
+
+- Set `uses_reconciliation_tool=True` only for roles allowed to trigger the tool call.
+- Provide `api_key` or `agent_id` on each `OpenAIAgentConfig` if you want to reuse pre-provisioned agents.
+- Use the `primary_role` field to control which agent runs first.
+
+## Interpreting Results
+`orchestrator.run(...)` returns an `AgentRunOutput` dataclass:
+
+| Field | Description |
+| --- | --- |
+| `message` | The primary role's final response (default: supervisor). |
+| `messages_by_role` | Dict of agent role -> response text (includes reviewer summaries). |
+| `tool_output` | Structured reconciliation payload composed of: |
+|  | - `reconciliations` - variance rows with supporting transactions |
+|  | - `roll_forward` - ordered schedule with opening balance, activity, adjustments, closing |
+|  | - `insights` - textual commentary generated by the reconciliation engine |
+
+Feed `tool_output` into downstream exports (`src/recon_agent/output.py`), write to audit logs, or display in your UI.
+
+## Troubleshooting
+- `OPENAI_API_KEY not set` - update `.env` or export the variable before running.
+- `requires_action` without tool permissions - ensure the role's `uses_reconciliation_tool` flag is `True`.
+- Schema validation failures - double-check the payload keys (typos in `gl_balances`/`subledger_balances` are common).
+- Slow responses - the orchestrator polls the OpenAI API once per second; large reconciliations or multi-role chains may take longer.
+
+## Next Steps
+- Explore `notebooks/openai_agents_demo.ipynb` for an end-to-end walkthrough with sample data.
+- Extend the reviewer instructions to generate tailored narratives for executives, auditors, or operations teams.
+- Integrate the orchestrator into your month-end job scheduler to automate variance analysis at scale.

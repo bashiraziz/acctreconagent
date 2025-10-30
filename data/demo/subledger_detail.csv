@@ -1,0 +1,6 @@
+subledger,account,posting_date,vendor_customer,document_number,description,amount
+AP,2000,2024-10-09,Northwind Supplies,AP-2045,October facility maintenance,-2200.00
+AP,2000,2024-10-18,Northwind Supplies,PMT-872,Payment of AP-2045,2200.00
+Inventory,1000,2024-10-05,Warehouse 3,INV-1044,Inventory receipt 10/05,2500.00
+Inventory,1000,2024-10-15,Warehouse 3,ADJ-42,Inventory shrinkage,-1500.00
+AccruedExp,2500,2024-10-25,Month-end close,JE-900,Accrued utilities true-up,-300.00

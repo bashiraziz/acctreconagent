@@ -1,0 +1,6 @@
+account,posting_date,description,debit,credit,reference
+1000,2024-10-05,Inventory receipt INV-1044,2500.00,0.00,INV-1044
+1000,2024-10-15,Inventory write-off ADJ-42,0.00,1500.00,ADJ-42
+2000,2024-10-09,Vendor invoice AP-2045,0.00,2200.00,AP-2045
+2000,2024-10-18,Vendor payment PMT-872,2200.00,0.00,PMT-872
+2500,2024-10-25,Accrual true-up JE-900,0.00,300.00,JE-900

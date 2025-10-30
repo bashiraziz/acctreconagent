@@ -1,0 +1,6 @@
+account,posting_date,journal_number,document_number,description,debit,credit
+1000,2024-10-01,JE-2301,INV-1044,Inventory receipt from PO 556,2500.00,0.00
+1000,2024-10-15,JE-2310,ADJ-42,Inventory shrinkage adjustment,0.00,1500.00
+2000,2024-10-09,JE-2402,AP-2045,Vendor invoice for services,0.00,2200.00
+2000,2024-10-18,JE-2408,PMT-872,Vendor wire payment,2200.00,0.00
+2500,2024-10-25,JE-2505,JE-900,Accrued expenses true-up,0.00,300.00
