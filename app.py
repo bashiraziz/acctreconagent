@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import re
 import sys
 from datetime import date
@@ -26,6 +27,9 @@ from recon_agent import (  # type: ignore  # pylint: disable=wrong-import-positi
     Transaction,
 )
 
+REPO_URL = os.getenv("ACCTRECON_REPO_URL", "https://github.com/your-org/acctreconagent")
+README_URL = os.getenv("ACCTRECON_README_URL", f"{REPO_URL}#readme")
+DOCS_URL = os.getenv("ACCTRECON_DOCS_URL", f"{REPO_URL}/blob/main/docs/openai_agents.md")
 
 DEFAULT_COLUMN_ALIASES: Dict[str, Dict[str, List[str]]] = {
     "balances": {
@@ -516,6 +520,16 @@ with st.expander("How to use this app", expanded=False):
 
 with st.sidebar:
     st.header("Controls")
+    st.markdown("### Resources")
+    st.markdown(
+        "\n".join(
+            [
+                f"- [Project repository]({REPO_URL})",
+                f"- [README / Quickstart]({README_URL})",
+                f"- [Detailed docs]({DOCS_URL})",
+            ]
+        )
+    )
     threshold = st.number_input(
         "Materiality threshold",
         min_value=0.0,
