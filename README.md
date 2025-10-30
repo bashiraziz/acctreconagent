@@ -8,6 +8,7 @@ Agentic toolkit for automating GL reconciliations and roll forward schedules.
 - Roll forward builder to assemble period-over-period schedules.
 - Agent orchestrator for coordinating reconciliation, scheduling, and insights.
 - CSV export helpers and a Streamlit UI for downstream workflows.
+- Flexible column alias mapping to accommodate varied export headers.
 - OpenAI Agents SDK orchestration with Gemini-powered narrative commentary.
 
 ## Setup (uv)
@@ -29,11 +30,17 @@ Fill in the following values:
 
 ## Streamlit UI (MVP)
 1. Launch the app: `uv run streamlit run app.py`.
-2. Upload CSVs with the following headers:
+2. Upload CSV or Excel files with the following headers:
    - GL balances: `account`, `period` (YYYY-MM), `amount`.
    - Subledger balances: `account`, `period`, `amount`.
-   - Transactions (optional): `account`, `booked_at` (date), plus `amount` or `debit`/`credit`, optional `period`.
+   - Transactions (optional): `account`, `posting_date` (date), plus `amount` or `debit`/`credit`, optional `period`.
 3. Adjust the materiality slider and click **Run reconciliation** to view results and export CSV outputs.
+4. Use the **Column aliases** expander to override headers with JSON or plain lines like `Balances account column = GL Account, Account Code` or `Transactions posting date = Posting Date`.
+5. Each upload supports CSV/XLSX files up to 20 MB (enforced via `.streamlit/config.toml`).
+6. Optional uploads:
+   - **Detailed transactions file** – single activity extract (GL or subledger) containing account, posting date, amount, and description so the app can build period activity automatically.
+   - **GL detail file** – full general-ledger journal detail with document numbers, sources, etc.; used to trace GL-side variances.
+   - **Subledger detail file** – supporting subledger activity export (AP, AR, inventory, etc.) for variance drill-down.
 
 ## OpenAI Agents Orchestration
 1. Export credentials (PowerShell example):
@@ -52,6 +59,8 @@ Fill in the following values:
        GeminiLLM,
        OpenAIAgentConfig,
        OpenAIAgentOrchestrator,
+       OpenAIMultiAgentConfig,
+       OrchestratedAgent,
        ReconciliationAgent,
    )
 
@@ -59,19 +68,39 @@ Fill in the following values:
        config=AgentConfig(materiality_threshold=10),
        insight_generator=GeminiInsightGenerator(GeminiLLM(GeminiConfig())),
    )
-   orchestrator = OpenAIAgentOrchestrator(reconciliation, OpenAIAgentConfig())
+   multi_config = OpenAIMultiAgentConfig(
+       agents=[
+           OrchestratedAgent(
+               role="supervisor",
+               config=OpenAIAgentConfig(
+                   name="Reconciliation Supervisor",
+                   instructions="Coordinate reconciliations by calling run_reconciliation when needed."
+               ),
+               uses_reconciliation_tool=True,
+           ),
+           OrchestratedAgent(
+               role="reviewer",
+               config=OpenAIAgentConfig(
+                   name="Reconciliation Reviewer",
+                   instructions="Review the reconciliation output and draft next steps for accounting."
+               ),
+           ),
+       ]
+   )
+   orchestrator = OpenAIAgentOrchestrator(reconciliation, multi_config)
    reply = orchestrator.run("Reconcile account 1000 with the provided data", tool_payload={
        "gl_balances": [...],
        "subledger_balances": [...],
        "transactions": [...],
    })
-   print(reply)
+   print(reply.message)
+   print(reply.messages_by_role.get("reviewer"))
    ```
 3. Provide JSON payloads that match the tool schema (see `src/recon_agent/openai_agent.py`).
 
 ## Quickstart
 1. Swap the sample data in `main.py` with your GL and subledger extracts.
-2. Adapt or plug in data sources from `src/recon_agent/datasources.py`.
+2. Adapt or plug in data sources from `src/recon_agent/datasources.py` (use `DataSourceConfig.column_aliases` to map your header names).
 3. Export results with `src/recon_agent/output.py` or extend with your workflow tooling.
 
 ## Next Steps

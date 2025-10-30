@@ -11,7 +11,13 @@ from .models import (
     RollForwardSchedule,
     Transaction,
 )
-from .openai_agent import OpenAIAgentConfig, OpenAIAgentOrchestrator
+from .openai_agent import (
+    AgentRunOutput,
+    OpenAIAgentConfig,
+    OpenAIAgentOrchestrator,
+    OpenAIMultiAgentConfig,
+    OrchestratedAgent,
+)
 from .output import export_reconciliations, export_roll_forward
 from .reconciliation import ReconciliationEngine
 from .rollforward import RollForwardBuilder
@@ -27,6 +33,8 @@ __all__ = [
     "GeminiLLM",
     "OpenAIAgentConfig",
     "OpenAIAgentOrchestrator",
+    "OpenAIMultiAgentConfig",
+    "OrchestratedAgent",
     "LedgerBalance",
     "ReconciliationResult",
     "RollForwardLine",
@@ -37,3 +45,5 @@ __all__ = [
     "ReconciliationEngine",
     "RollForwardBuilder",
 ]
+
+

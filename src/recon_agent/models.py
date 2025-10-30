@@ -40,6 +40,8 @@ class ReconciliationResult:
     subledger_balance: float
     variance: float
     unresolved_transactions: List[Transaction] = field(default_factory=list)
+    gl_transactions: List[Transaction] = field(default_factory=list)
+    subledger_transactions: List[Transaction] = field(default_factory=list)
     notes: List[str] = field(default_factory=list)
 
 

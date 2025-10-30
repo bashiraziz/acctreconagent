@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from collections import defaultdict
 from typing import Dict, Iterable, List, Tuple
@@ -22,18 +22,38 @@ class ReconciliationEngine:
         sub_map = self._group_balances(subledger_balances)
         txn_map = self._group_transactions(transactions or [])
 
-        accounts = set(gl_map.keys()) | set(sub_map.keys())
+        account_periods = set(gl_map.keys()) | set(sub_map.keys()) | set(txn_map.keys())
         results: List[ReconciliationResult] = []
-        for account, period in sorted(accounts):
+        for account, period in sorted(account_periods):
             gl_amount = gl_map.get((account, period), 0.0)
             sub_amount = sub_map.get((account, period), 0.0)
             variance = gl_amount - sub_amount
-            unresolved = txn_map.get((account, period), []) if abs(variance) > self.materiality_threshold else []
+
+            ledger_txns = txn_map.get((account, period), {})
+            gl_txns = ledger_txns.get("GL", [])
+            sub_txns = ledger_txns.get("Subledger", [])
+            other_txns: List[Transaction] = []
+            for ledger_name, txns in ledger_txns.items():
+                if ledger_name not in {"GL", "Subledger"}:
+                    other_txns.extend(txns)
+
             notes: List[str] = []
             if abs(variance) > self.materiality_threshold:
                 notes.append(
                     f"Variance of {variance:.2f} exceeds threshold {self.materiality_threshold:.2f}."
                 )
+
+            if gl_txns or sub_txns:
+                gl_total = sum(txn.net for txn in gl_txns)
+                sub_total = sum(txn.net for txn in sub_txns)
+                notes.append(
+                    f"GL detail net {gl_total:.2f}; Subledger detail net {sub_total:.2f}."
+                )
+
+            unresolved: List[Transaction] = []
+            if abs(variance) > self.materiality_threshold:
+                unresolved = gl_txns + sub_txns + other_txns
+
             results.append(
                 ReconciliationResult(
                     account=account,
@@ -42,6 +62,8 @@ class ReconciliationEngine:
                     subledger_balance=sub_amount,
                     variance=variance,
                     unresolved_transactions=unresolved,
+                    gl_transactions=gl_txns,
+                    subledger_transactions=sub_txns,
                     notes=notes,
                 )
             )
@@ -54,12 +76,25 @@ class ReconciliationEngine:
             grouped[(balance.account, balance.period)] += balance.amount
         return grouped
 
-    @staticmethod
+    @classmethod
     def _group_transactions(
-        transactions: Iterable[Transaction],
-    ) -> Dict[Tuple[str, str], List[Transaction]]:
-        grouped: Dict[Tuple[str, str], List[Transaction]] = defaultdict(list)
+        cls, transactions: Iterable[Transaction],
+    ) -> Dict[Tuple[str, str], Dict[str, List[Transaction]]]:
+        grouped: Dict[Tuple[str, str], Dict[str, List[Transaction]]] = defaultdict(dict)
         for txn in transactions:
             period = txn.metadata.get("period", "")
-            grouped[(txn.account, period)].append(txn)
+            ledger = cls._normalize_ledger_label(txn.metadata.get("ledger"))
+            bucket = grouped.setdefault((txn.account, period), {})
+            bucket.setdefault(ledger, []).append(txn)
         return grouped
+
+    @staticmethod
+    def _normalize_ledger_label(label: str | None) -> str:
+        if not label:
+            return "Other"
+        cleaned = label.strip().lower()
+        if cleaned in {"gl", "general ledger", "general_ledger", "general-ledger"}:
+            return "GL"
+        if cleaned in {"subledger", "sub-ledger", "sl", "sub"}:
+            return "Subledger"
+        return label.strip() or "Other"
